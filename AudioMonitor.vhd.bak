@@ -1,0 +1,107 @@
+-- AudioMonitor.vhd
+-- Created 2023
+--
+-- This SCOMP peripheral passes data from an input bus to SCOMP's I/O bus.
+
+library IEEE;
+library lpm;
+
+use IEEE.std_logic_1164.all;
+use IEEE.std_logic_arith.all;
+use IEEE.std_logic_unsigned.all;
+use lpm.lpm_components.all;
+use IEEE.numeric_std.all;				-- added to use to_integer
+
+entity AudioMonitor is
+port(
+    CS          : in  std_logic;
+    IO_WRITE    : in  std_logic;
+    SYS_CLK     : in  std_logic;  -- SCOMP's clock
+    RESETN      : in  std_logic;
+    AUD_DATA    : in  std_logic_vector(15 downto 0);
+    AUD_NEW     : in  std_logic;
+    IO_DATA     : inout  std_logic_vector(15 downto 0)
+);
+end AudioMonitor;
+
+architecture a of AudioMonitor is
+
+
+	 constant THRESHOLD : integer := 512;
+	 
+    signal out_en      : std_logic;
+    signal parsed_data : std_logic_vector(15 downto 0);
+    signal output_data : std_logic_vector(15 downto 0);
+	 signal snapped	  : std_logic := '0';
+	 
+	 TYPE STATE_TYPE IS (startState, waitState, snapState);
+	 SIGNAL STATE : STATE_TYPE;
+	 
+	 shared variable count : integer := 0;
+
+begin
+
+    -- Latch data on rising edge of CS to keep it stable during IN
+    process (CS) begin
+        if rising_edge(CS) then
+            output_data <= parsed_data;
+        end if;
+    end process;
+    -- Drive IO_DATA when needed.
+    out_en <= CS AND ( NOT IO_WRITE );
+    with out_en select IO_DATA <=
+        output_data        when '1',
+        "ZZZZZZZZZZZZZZZZ" when others;
+
+    -- Snap Detection Portion									(what was on canvas, not really sure how this works)
+    
+	 -- |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 
+	 --Snap Detection Portion								(what I came up with)
+	 process (RESETN, SYS_CLK, CS, IO_WRITE)
+    begin
+        if (RESETN = '0'  OR (CS = '1' AND IO_WRITE = '1') then
+            STATE <= startState;
+				count := 0;
+        elsif (rising_edge(AUD_NEW)) then
+				CASE STATE IS
+					WHEN startState =>
+						if (AUD_DATA >= THRESHOLD) then
+							STATE <= waitState;
+							snapped <= '0';
+							parsed_data <= (others => snapped);
+						else
+							STATE <= startState;
+							snapped <= '0';
+							parsed_data <= (others => snapped);
+						end if;
+					
+					WHEN waitState =>
+						if (AUD_DATA >= THRESHOLD) then
+							STATE <= waitState;
+							count := count + 1;
+							snapped <= '0';
+							parsed_data <= (others => snapped);
+						else
+							if (count <= 500) then 
+								STATE <= snapState;
+								snapped <= '1';
+								parsed_data <= (others => snapped);
+							else
+								STATE <= startState;
+								snapped <= '0';
+								parsed_data <= (others => snapped);
+							end if;
+						end if;
+					WHEN snapState =>
+						state <= snapState;
+				END CASE;	    
+        end if;
+		  
+		  if (CS = '1' AND IO_WRITE = '0') then
+				STATE <= startState;
+				snapped <= '0';
+				parsed_data <= x"0000";
+		  end if;
+    end process;
+end a;

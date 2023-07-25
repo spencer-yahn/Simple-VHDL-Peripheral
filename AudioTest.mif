@@ -1,0 +1,83 @@
+WIDTH=16;
+DEPTH=2048;
+
+ADDRESS_RADIX=HEX;
+DATA_RADIX=HEX;
+
+CONTENT BEGIN
+0000: B800; -- 	LOADI	0
+0001: 1047; -- 	STORE	Score			; Initialize the score to 0 at start
+0002: B800; -- 	LOADI 	0				; Reseting variables to 0 at start of new round
+0003: 1044; -- 	STORE	ValA			; Set player 1's score to 0
+0004: 1046; -- 	STORE	ValB			; Set player 2's score to 0
+0005: 1045; -- 	STORE	ValAS			; Set the shifted version of player 1's score to 0
+0006: 9000; -- 	IN		Switches		; Reading from switches, will get 16 if SW4 is up
+0007: 6FF0; --     ADDI 	-16				; Subtracting 16 from the Switch output, AC will be 0 if SW4 was up
+0008: 400A; --     JZERO 	Record1			; If AC is 0, jump to Record1
+0009: 2806; --     JUMP	Wait			; If not, go back to wait and check if SW4 is up
+000A: B800; -- 	LOADI	0
+000B: 9804; -- 	OUT		Hex0
+000C: 9850; -- 	OUT 	OP				; Starts the peripheral, peripheral will start detecting snaps
+000D: B801; --     LOADI	1
+000E: 9801; --     OUT 	LEDs			; LED0 will be on to indicate that the peripheral is recording data
+000F: 9000; --     IN 		Switches		; Read from switches, if SW4 is up AC will be 16.
+0010: 4012; --     JZERO	Show			; If all switches are down, AC will be 0, and control jumps to Show
+0011: 280D; --     JUMP	Record2			; If not, go back to Record2 to continue collecting data
+0012: B800; -- 	LOADI	0
+0013: 9801; --     OUT		LEDs			; Indicate recording is done, turns LED0 off
+0014: 9050; -- 	IN		OP				; Take player 1's letter data from peripheral
+0015: 1044; -- 	STORE	ValA			; Store letter data into ValA
+0016: 6008; -- 	SHIFT	8				; Shift the 2 letters 8 bits to the left
+0017: 1045; -- 	STORE	ValAS			; Store shifted player 1 data in ValAS
+0018: 9804; --     OUT		Hex0			; Output shifted player 1 data on Hex0
+0019: 281A; --     JUMP	WaitB			; Jump to WaitB
+001A: 9000; -- 	IN		Switches		; Reading from switches, will get 16 if SW4 is up
+001B: 6FF0; --     ADDI 	-16				; Subtracting 16 from the Switch output, AC will be 0 if SW4 was up
+001C: 401E; --     JZERO 	RecordB1		; If AC is 0, jump to RecordB1
+001D: 281A; --     JUMP	WaitB			; If not, go back to waitB and check if SW4 is up
+001E: 9850; -- 	OUT 	OP				; Starts the peripheral: peripheral will start detecting snaps
+001F: B801; --     LOADI	1
+0020: 9801; --     OUT 	LEDs			; LED0 will be on to indicate that the peripheral is recording data
+0021: 9000; --     IN 		Switches		; Read from switches, if SW4 is up AC will be 16.
+0022: 4024; --     JZERO	ShowB			; If all switches are down, AC will be 0, and control jumps to ShowB
+0023: 281F; --     JUMP	RecordB2		; If not, go back to RecordB2 to continue collecting data
+0024: B800; -- 	LOADI	0
+0025: 9801; --     OUT		LEDs			; Indicate recording is done, turns LED0 off
+0026: 9050; -- 	IN		OP				; Take player 2's letter data from peripheral
+0027: 1046; -- 	STORE	ValB			; Store letter data into ValB
+0028: 5045; -- 	OR 		ValAS			; Bitwise OR with ValB and ValAS (ValA shifted left 8 bits)
+0029: 9804; --     OUT		Hex0			; Output this combined output to Hex0
+002A: 282B; --     JUMP	Ignore7+		; Jump to Ignore7+
+002B: 0844; -- 	LOAD	ValA			; Loads ValA, player 1's letters
+002C: 4848; -- 	AND	 	FirstLtr		; Bitwise AND masks ValA to get only the first letter
+002D: 6F90; -- 	ADDI    -112			; 0x70 in decimal, checks if first letter was 7
+002E: 4002; -- 	JZERO	ResetRound		; Jumps to ResetRound if AC is 0
+002F: 0844; -- 	LOAD	ValA			; Loads ValA, player 1's letters
+0030: 4849; -- 	AND	 	SecondLtr		; Bitwise AND masks ValA to get only the second letter
+0031: 6FF9; -- 	ADDI    -7				; 0x07 in decimal, checks if second letter was 7
+0032: 4002; -- 	JZERO	ResetRound		; Jumps to ResetRound if AC is 0
+0033: 0846; -- 	LOAD	ValB			; Loads ValA, player 2's letters
+0034: 4848; -- 	AND	 	FirstLtr		; Bitwise AND masks ValB to get only the first letter
+0035: 6F90; -- 	ADDI    -112			; 0x70 in decimal, checks if first letter was 7
+0036: 4002; -- 	JZERO	ResetRound		; Jumps to ResetRound if AC is 0
+0037: 0846; -- 	LOAD	ValB			; Loads ValB, player 2's letters
+0038: 4849; -- 	AND	 	SecondLtr		; Bitwise AND masks ValB to get only the second letter
+0039: 6FF9; -- 	ADDI    -7				; 0x07 in decimal, checks if second letter was 7
+003A: 4002; -- 	JZERO	ResetRound		; Jumps to ResetRound if AC is 0
+003B: 0844; -- 	LOAD	ValA			; Loads ValA (from player 1) into AC
+003C: 2046; -- 	SUB		ValB			; Subtracts ValB from ValA
+003D: 403F; -- 	JZERO	Matched			; If ValA = ValB, then jump to Matched
+003E: 2802; -- 	JUMP	ResetRound		; If ValA /= ValB, jump to ResetRound
+003F: 0847; -- 	LOAD	Score			; Load the current score value
+0040: 6801; -- 	ADDI	1				; Increment score by 1
+0041: 1047; -- 	STORE	Score			; Store the incremented score back to score
+0042: 9805; -- 	OUT		Hex1			; Update Hex1 with the incremented score
+0043: 2802; -- 	JUMP	ResetRound		; Jump to ResetRound after updating score
+0044: 0000; -- ValA:		DW	0				; Player 1's letter data from the peripheral
+0045: 0000; -- ValAS:		DW	0				; ValA shifted left by 8 bits
+0046: 0000; -- ValB:		DW	0				; Player 2's letter data from the peripheral
+0047: 0000; -- Score:		DW	0				; Score variable
+0048: 00F0; -- FirstLtr: 	DW	240				; 0xF0, used to get only the first letter from a player
+0049: 000F; -- SecondLtr:	DW	15				; 0x0F, used to get onlt the second letter from a player
+[004A..07FF] : 0000; -- [empty memory]
+END;
